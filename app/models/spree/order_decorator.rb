@@ -14,17 +14,20 @@ Spree::Order.class_eval do
 
     self.errors[:delivery_date] << 'cannot be blank' unless self.delivery_date
 
+    lead_time = SpreeDeliveryOptions::Config.delivery_leadtime_days
+
     if self.delivery_date
-      self.errors[:delivery_date] << 'cannot be today or in the past' if self.delivery_date <= Date.today
+      self.errors[:delivery_date] << "Delivery date must be at leeast #{lead_time.day.from_now.to_date} from now" if self.delivery_date <= lead_time.days.from_now
 
       options = week_day_options(self.delivery_date)
       unless options
         self.errors[:delivery_date] << "is not available on the selected week day."
       end
 
+      lead_time = SpreeDeliveryOptions::Config.delivery_leadtime_days
       cutoff_time = Time.now.change(hour: SpreeDeliveryOptions::Config.delivery_cut_off_hour)
-      if self.delivery_date == Date.tomorrow && Time.now > cutoff_time
-        self.errors[:delivery_date] << "cannot be tomorrow if the order is created after #{SpreeDeliveryOptions::Config.delivery_cut_off_hour}"
+      if self.delivery_date == lead_time.day.from_now.to_date && Time.now > cutoff_time
+        self.errors[:delivery_date] << "cannot be #{self.delivery_date} if the order is created after #{SpreeDeliveryOptions::Config.delivery_cut_off_hour}"
       end
     end
 

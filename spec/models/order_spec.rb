@@ -6,6 +6,7 @@ describe Spree::Order do
 
   before :each do
     SpreeDeliveryOptions::Config.delivery_time_options = {monday: ['Between 6-7am']}.to_json
+    SpreeDeliveryOptions::Config.delivery_leadtime_days = 1
   end
 
   describe 'delivery instructions' do
@@ -68,18 +69,43 @@ describe Spree::Order do
         order.errors[:delivery_date].should_not be_empty
       end
 
-      it 'should not be valid if delivery date is tomorrow and it is past the cutoff time' do
-        time_now = DateTime.parse("17/11/2013 #{SpreeDeliveryOptions::Config.delivery_cut_off_hour}:01 +1100")
+      describe 'validating lead time' do
+        it 'should not be valid if delivery date is tomorrow and leadtime is 2 days' do
+          SpreeDeliveryOptions::Config.delivery_leadtime_days = 2
+          time_now = Time.local(2013, 11, 17, SpreeDeliveryOptions::Config.delivery_cut_off_hour-1, 59, 0)
+          Timecop.freeze(time_now)
+
+          order.delivery_date = '18/11/2013'
+          order.valid_delivery_date?.should == false
+          order.errors[:delivery_date].should_not be_empty
+          Timecop.return
+        end
+
+        it 'should be valid if delivery date is the same minimum leadtime' do
+          SpreeDeliveryOptions::Config.delivery_leadtime_days = 2
+          time_now = Time.local(2013, 11, 15, SpreeDeliveryOptions::Config.delivery_cut_off_hour-1, 59, 0)
+          Timecop.freeze(time_now)
+
+          order.delivery_date = '18/11/2013'
+          order.valid_delivery_date?.should be_true
+          order.errors[:delivery_date].should be_empty
+          Timecop.return
+        end
+      end
+
+      it 'should not be valid if delivery date is before minimum lead time' do
+        time_now = Time.local(2013, 11, 17, SpreeDeliveryOptions::Config.delivery_cut_off_hour-1, 59, 0)
         Timecop.freeze(time_now)
 
-        order.delivery_date = '18/11/2013'
-        order.valid_delivery_date?.should == false
+        order.delivery_date = '17/11/2013'
+        order.valid_delivery_date?.should be_false
         order.errors[:delivery_date].should_not be_empty
+
         Timecop.return
       end
 
-      it 'should be valid if delivery date is tomorrow but is before the cutoff time' do
-        time_now = DateTime.parse("17/11/2013 #{SpreeDeliveryOptions::Config.delivery_cut_off_hour-1}:59 +1100")
+      it 'should be valid if delivery date is min leadtime but is before the cutoff time' do
+        time_now = Time.local(2013, 11, 16, SpreeDeliveryOptions::Config.delivery_cut_off_hour-1, 59, 0)
         Timecop.freeze(time_now)
 
         order.delivery_date = '18/11/2013'
@@ -97,9 +123,13 @@ describe Spree::Order do
       end
 
       it 'should allow delivery time to be in a valid delivery day' do
+        #freeze to Tuesday
+        time_now = DateTime.now.next_week.next_day(1)
+        Timecop.freeze(time_now)
         order.delivery_date =  DateTime.now.next_week.next_day(0)
         order.valid_delivery_date?#.should == true
         order.errors[:delivery_date].should be_empty
+        Timecop.return
       end
 
       it 'should not allow delivery time to be in a non delivery day' do
