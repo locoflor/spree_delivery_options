@@ -3,7 +3,7 @@ function SpreeDeliveryOptions() {
   var that = this;
 
   this.initializeDatePicker = function() {
-     $('#order_delivery_date').datepicker({dateFormat: "dd/mm/yy"});
+     $('#order_delivery_date').datepicker({dateFormat: "dd/mm/yy", minDate: <%= SpreeDeliveryOptions::Config.delivery_leadtime_days %>});
   };
 
   this.initializeDeliveryTimeSelect = function() {
